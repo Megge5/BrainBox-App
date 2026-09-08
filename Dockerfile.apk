@@ -1,0 +1,66 @@
+# ==============================================================================
+# BrainBox Android APK Dockerfile Builder
+# ==============================================================================
+# Builds the BrainBox Android APK in an isolated, reproducible environment
+# without requiring local Android SDK or Java setup.
+#
+# Quick Build Command:
+#   docker build -f Dockerfile.apk -t brainbox-apk .
+#
+# To extract the APK:
+#   docker run --rm -v $(pwd)/dist-apk:/out brainbox-apk cp /app/BrainBox-debug.apk /out/
+# ==============================================================================
+
+FROM eclipse-temurin:17-jdk-jammy AS builder
+
+# Set environment variables
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+
+# Install prerequisites
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    unzip \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download Android SDK command-line tools
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip && \
+    unzip -q /tmp/cmdline-tools.zip -d ${ANDROID_HOME}/cmdline-tools && \
+    mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
+    rm /tmp/cmdline-tools.zip
+
+# Accept licenses & install Android SDK components (API 35 & Build-Tools 35.0.0)
+RUN yes | sdkmanager --licenses > /dev/null && \
+    sdkmanager --install \
+        "platform-tools" \
+        "platforms;android-35" \
+        "build-tools;35.0.0"
+
+# Set working directory
+WORKDIR /app
+
+# Copy Android source files
+COPY android/ /app/android/
+
+WORKDIR /app/android
+
+# Ensure gradlew executable
+RUN chmod +x gradlew || true
+
+# Build Debug APK
+RUN ./gradlew assembleDebug --no-daemon --stacktrace || gradle assembleDebug
+
+# Copy output APK to standard location
+RUN mkdir -p /app/build-out && \
+    find /app/android/app/build/outputs/apk/ -name "*.apk" -exec cp {} /app/BrainBox-debug.apk \;
+
+# Final minimal export stage
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/BrainBox-debug.apk /app/BrainBox-debug.apk
+
+CMD ["cp", "/app/BrainBox-debug.apk", "/out/"]

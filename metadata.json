@@ -1,0 +1,6 @@
+{
+  "name": "BrainBox",
+  "description": "A modern Android brain-training and entertainment app featuring 6 cognitive mini-games: Memory Match, Reaction Test, Pattern Challenge, Number Challenge, Code Breaker, and 8-Puzzle.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
